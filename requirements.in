@@ -1,0 +1,22 @@
+# Conversion-stage dependencies for images/stt/Dockerfile.
+# The image is linux/amd64, Python 3.12. Regenerate the lock with:
+#
+#   docker run --rm -v "$PWD":/work -w /work python:3.12-slim \
+#     bash -lc 'pip install -q uv && uv pip compile requirements.in \
+#       --python-version 3.12 \
+#       --python-platform x86_64-manylinux_2_28 \
+#       --index-strategy unsafe-best-match \
+#       --generate-hashes \
+#       --emit-index-url \
+#       --output-file requirements.txt'
+#
+# torch==2.14.1+cpu is the CPU wheel from the PyTorch index (not on PyPI).
+# That index also publishes an older numpy, so resolution has to see both
+# indexes (--index-strategy unsafe-best-match). Hashes still pin every file.
+# This stage only casts and writes ggml; it does not run inference.
+# huggingface_hub stays below 2 because transformers 5.18's tokenizers pin does.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1+cpu
+transformers==5.18.0
+numpy==2.5.3
+huggingface_hub==1.33.0

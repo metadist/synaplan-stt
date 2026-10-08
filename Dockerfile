@@ -36,18 +36,15 @@ ARG MODEL_REVISION
 ARG VAD_REPO
 ARG VAD_REVISION
 ARG VAD_SHA256
-ARG TORCH_VERSION=2.14.1
-ARG TRANSFORMERS_VERSION=5.18.0
-ARG NUMPY_VERSION=2.5.3
-# tokenizers (pulled by transformers 5.18) needs huggingface_hub < 2.
-ARG HF_HUB_VERSION=1.33.0
-
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_ROOT_USER_ACTION=ignore \
     HF_HUB_DISABLE_TELEMETRY=1
 
-RUN pip install --no-cache-dir "torch==${TORCH_VERSION}" --index-url https://download.pytorch.org/whl/cpu \
- && pip install --no-cache-dir "transformers==${TRANSFORMERS_VERSION}" "numpy==${NUMPY_VERSION}" "huggingface_hub==${HF_HUB_VERSION}"
+# Fully pinned, including transitive wheels. linux/amd64, Python 3.12.
+# See requirements.in for how to regenerate requirements.txt.
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.txt \
+ && rm /tmp/requirements.txt
 
 WORKDIR /work
 

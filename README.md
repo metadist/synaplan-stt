@@ -19,8 +19,10 @@ through `speech.whisperServerUrl`.
 | `/usr/share/doc/synaplan-stt/` | Licence texts and model cards | — |
 
 Every source is pinned (commit, revision, digest or sha256) in the
-`Dockerfile`. The build converts the Transformers checkpoint to ggml and
-quantizes it, so the image does not depend on a third-party ggml upload.
+`Dockerfile`. Python packages for the conversion stage, including transitive
+dependencies, are pinned with hashes in `requirements.txt`. The build converts
+the Transformers checkpoint to ggml and quantizes it, so the image does not
+depend on a third-party ggml upload.
 
 ## API
 
