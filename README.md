@@ -41,7 +41,7 @@ One server process decodes one request at a time.
 | `STT_LANGUAGE` | `de` (a request's `language` wins; `auto` detects) |
 | `STT_THREADS` | `4` (set to the CPU limit for the cpu variant) |
 | `STT_MODEL` | `/models/ggml-large-v3-turbo-german-q8_0.bin` |
-| `STT_VAD` | `false` |
+| `STT_VAD` | `true` |
 | `STT_PORT` | `8080` |
 
 Arguments after the image name are passed to `whisper-server`.

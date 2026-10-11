@@ -118,7 +118,7 @@ ENV HOME=/tmp \
     STT_THREADS=4 \
     STT_INFERENCE_PATH=/v1/audio/transcriptions \
     STT_TMP_DIR=/tmp \
-    STT_VAD=false \
+    STT_VAD=true \
     STT_VAD_MODEL=/models/ggml-silero-v5.1.2.bin
 
 USER 65532:65532
