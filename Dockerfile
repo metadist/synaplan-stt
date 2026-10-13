@@ -3,8 +3,8 @@
 # synaplan-stt: whisper.cpp `whisper-server` with the German Whisper
 # large-v3-turbo fine-tune (q8_0) and the Silero VAD model baked in.
 #
-#   docker build --build-arg VARIANT=cuda -t synaplan-stt:dev-cuda images/stt
-#   docker build --build-arg VARIANT=cpu  -t synaplan-stt:dev-cpu  images/stt
+#   docker build --build-arg VARIANT=cuda -t synaplan-stt:dev-cuda .
+#   docker build --build-arg VARIANT=cpu  -t synaplan-stt:dev-cpu  .
 #
 # The cuda variant links libcuda.so.1 from the host driver: it starts only on a
 # node with an NVIDIA GPU exposed to the container. Use the cpu variant elsewhere.
@@ -91,14 +91,16 @@ FROM ${BASE_CPU} AS runtime-cpu
 FROM runtime-${VARIANT}
 ARG VARIANT
 ARG VERSION=0.0.0-dev
+ARG REVISION=unknown
 ARG WHISPER_CPP_REF
 ARG MODEL_REPO
 ARG MODEL_REVISION
 
 LABEL org.opencontainers.image.title="synaplan-stt" \
       org.opencontainers.image.description="whisper.cpp whisper-server with the German Whisper large-v3-turbo model (q8_0) for Synaplan" \
-      org.opencontainers.image.source="https://github.com/metadist/synaplan-charts" \
+      org.opencontainers.image.source="https://github.com/metadist/synaplan-stt" \
       org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}" \
       org.opencontainers.image.licenses="MIT AND Apache-2.0" \
       com.metadist.stt.variant="${VARIANT}" \
       com.metadist.stt.whisper-cpp="${WHISPER_CPP_REF}" \
