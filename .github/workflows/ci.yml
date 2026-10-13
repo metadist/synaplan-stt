@@ -1,0 +1,138 @@
+name: CI
+
+# ghcr.io/metadist/synaplan-stt in two variants, cuda and cpu.
+#   pull request      -> build both, start the cpu image
+#   main              -> latest-<variant>
+#   tag v<version>    -> <version>-<variant>, <major>.<minor>-<variant>
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+# Collapse concurrent runs on the same ref so rapid-fire pushes don't trigger
+# several multi-gigabyte image builds. PR builds are scoped per-PR ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.variant }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [cuda, cpu]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The CUDA base image is 3.7 GB and the conversion stage holds torch plus
+      # the 1.6 GB checkpoint; the default runner disk is too small for both.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker image prune -af
+          df -h /
+
+      - name: Version and tags
+        id: meta
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          image="${REGISTRY}/${IMAGE_NAME}"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF#refs/tags/v}"
+            tags="${image}:${version}-${VARIANT}"
+            # 1.2.3 also moves 1.2; a pre-release such as 1.2.3-rc.1 does not.
+            if [[ "$version" =~ ^([0-9]+\.[0-9]+)\.[0-9]+$ ]]; then
+              tags+=",${image}:${BASH_REMATCH[1]}-${VARIANT}"
+            fi
+          else
+            version="0.0.0-dev.$(git rev-parse --short HEAD)"
+            tags="${image}:latest-${VARIANT}"
+          fi
+          {
+            echo "version=${version}"
+            echo "tags=${tags}"
+            echo "first-tag=${tags%%,*}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Log in to the Container registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # No layer cache: the conversion stage alone exceeds the 10 GB a
+      # repository gets, and every input is pinned, so a rebuild is the same.
+      - name: Build and push
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          platforms: linux/amd64
+          build-args: |
+            VARIANT=${{ matrix.variant }}
+            VERSION=${{ steps.meta.outputs.version }}
+            REVISION=${{ github.sha }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+
+      # The cuda image is only built on pull requests: loading 4.3 GB into the
+      # runner's Docker does not fit next to the build, and it cannot start
+      # without a GPU anyway.
+      - name: Build for PR
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          platforms: linux/amd64
+          build-args: |
+            VARIANT=${{ matrix.variant }}
+            VERSION=${{ steps.meta.outputs.version }}
+            REVISION=${{ github.sha }}
+          load: ${{ matrix.variant == 'cpu' }}
+          tags: synaplan-stt:pr-${{ matrix.variant }}
+
+      # Same constraints the Helm chart applies: arbitrary non-root UID,
+      # read-only root filesystem, /tmp as the only writable path.
+      - name: cpu image loads the model and answers
+        if: github.event_name == 'pull_request' && matrix.variant == 'cpu'
+        run: |
+          docker run -d --name stt --read-only --tmpfs /tmp -p 127.0.0.1:8080:8080 synaplan-stt:pr-cpu
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/health; then
+              echo
+              docker run --rm --entrypoint sha256sum synaplan-stt:pr-cpu \
+                /models/ggml-large-v3-turbo-german-q8_0.bin /models/ggml-silero-v5.1.2.bin
+              exit 0
+            fi
+            sleep 5
+          done
+          docker logs stt
+          exit 1
+
+      - name: Model checksums
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE: ${{ steps.meta.outputs.first-tag }}
+        run: |
+          docker run --rm --entrypoint sha256sum "$IMAGE" \
+            /models/ggml-large-v3-turbo-german-q8_0.bin /models/ggml-silero-v5.1.2.bin \
+            | tee -a "$GITHUB_STEP_SUMMARY"
