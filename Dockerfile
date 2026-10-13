@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 #
 # synaplan-stt: whisper.cpp `whisper-server` with the German Whisper
 # large-v3-turbo fine-tune (q8_0) and the Silero VAD model baked in.
