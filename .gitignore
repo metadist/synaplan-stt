@@ -1,0 +1,17 @@
+# Audio samples used for local testing
+*.wav
+*.mp3
+*.ogg
+*.flac
+*.m4a
+
+# Model files, should they ever be converted outside the image build
+*.bin
+
+# Python
+__pycache__/
+.venv/
+venv/
+
+# Docker
+.docker/

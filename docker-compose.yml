@@ -1,0 +1,52 @@
+# Standalone synaplan-stt.
+#
+#   docker compose --profile cpu up -d   # cpu image, any x86-64 host
+#   docker compose --profile gpu up -d   # cuda image, needs the NVIDIA Container Toolkit
+#
+# Both listen on 127.0.0.1:8080; start one of them.
+
+services:
+  stt:
+    image: ghcr.io/metadist/synaplan-stt:${STT_TAG:-latest}-cpu
+    profiles: [cpu]
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      STT_LANGUAGE: ${STT_LANGUAGE:-de}
+      STT_THREADS: ${STT_THREADS:-8}
+    ports:
+      - "127.0.0.1:${STT_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+
+  stt-gpu:
+    image: ghcr.io/metadist/synaplan-stt:${STT_TAG:-latest}-cuda
+    profiles: [gpu]
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      STT_LANGUAGE: ${STT_LANGUAGE:-de}
+      STT_THREADS: ${STT_THREADS:-4}
+    ports:
+      - "127.0.0.1:${STT_PORT:-8080}:8080"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
